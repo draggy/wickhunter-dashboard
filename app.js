@@ -1,6 +1,13 @@
 const express = require('express');
 const morgan = require('morgan');
 const bodyParser = require('body-parser');
+const config = require('config');
+const {
+  WebhookClient,
+  MessageAttachment,
+  MessageEmbed
+} = require('discord.js');
+const fs = require('fs');
 
 const AppDAO = require('./data/dao')
 const BotRepository = require('./data/bot_repository')
@@ -41,6 +48,12 @@ app.param('name', function(req, res, next, name) {
   next();
 });
 
+
+const discord_webhook = new WebhookClient({
+  id: config.get('discord_webhook.id'),
+  token: config.get('discord_webhook.token')
+});
+
 app.post('/api/:name', function(req, res) {
   console.log("---" + req.name + "---");
   const content = req.body.content || req.body
@@ -64,13 +77,16 @@ app.post('/api/:name', function(req, res) {
       let updates = ParsingHelper.parseWebHook(content)
       console.debug(updates)
 
-      return Promise.all(updates.map((update) => {
-        const {
-          id,
-          name
-        } = bot
-        let isolation_activated = bot.isolation_activated
+      const {
+        id,
+        name
+      } = bot
+      let {
+        isolation_activated
+      } = bot
 
+      // Add update to sqlite db
+      const promises = updates.map((update) => {
         switch (update.repo_type) {
           case "BOT":
             if (update.status) {
@@ -149,11 +165,53 @@ app.post('/api/:name', function(req, res) {
           default:
             return Promise.resolve()
         }
+      });
+
+      // Send discord notification
+      promises.push(updates.map((update) => {
+        if (update.repo_type === "TRADE_CLOSED") {
+          const embed = new MessageEmbed()
+            .setTitle(update.direction + ' trade closed for ' + update.symbol)
+            .setDescription('Bot: ' + bot.name)
+            .addField('Qty', update.count + ' @ $' + update.price, true)
+            .addField('Profit', '$' + update.profit, true)
+            .setFooter({
+              text: '💰 Current Balance: $'
+            });
+
+          let files = [];
+          if (update.symbol.endsWith('USDT')) {
+            const lower_name = update.symbol.substring(0, update.symbol.length - 4).toLowerCase()
+            const file_path = './node_modules/cryptocurrency-icons/32@2x/color/' + lower_name + '@2x.png';
+            const custom_file_path = './images/symbols/' + lower_name + '.png';
+            if (fs.existsSync(file_path)) {
+              embed.setThumbnail('attachment://' + lower_name + '2x.png')
+              files.push(new MessageAttachment(file_path));
+            } else if (fs.existsSync(custom_file_path)) {
+              embed.setThumbnail('attachment://' + lower_name + '.png')
+              files.push(new MessageAttachment(custom_file_path));
+            }
+          }
+
+          if (update.direction === 'Long') {
+            embed.setColor('#58d531')
+          } else {
+            embed.setColor('#C50027')
+          }
+
+          return discord_webhook.send({
+            embeds: [embed],
+            files: files
+          });
+        } else {
+          return Promise.resolve()
+        }
       }))
+
+      //TODO add pushbullet logic
+
+      return Promise.all(promises)
     })
-
-  // Parsing helper figures out what type it is (repo) and returns the update object
-
 
   res.statusCode = 200;
   res.end();
