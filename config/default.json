@@ -1,0 +1,10 @@
+{
+  "server": {
+    "host": "localhost",
+    "port": 3100
+  },
+  "discord_webhook": {
+    "id": "1234",
+    "token": "abcd"
+  }
+}
