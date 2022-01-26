@@ -6,8 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js",
-    "prod": "npm start",
-    "local": "nodemon server.js"
+    "production": "node server.js",
+    "development": "nodemon server.js"
   },
   "repository": {
     "type": "git",
