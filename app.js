@@ -211,6 +211,7 @@ app.post('/api/:name', function(req, res) {
       //TODO add pushbullet logic
 
       return Promise.all(promises)
+      .catch(console.log)
     })
 
   res.statusCode = 200;
