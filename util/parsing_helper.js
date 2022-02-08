@@ -1,5 +1,3 @@
-const rjson = require('relaxed-json')
-
 module.exports = {
   parseWebHook: function(content) {
     let updates = [];
@@ -8,38 +6,50 @@ module.exports = {
       return updates
     }
 
-    let json = null
-    if (typeof content === "object") {
-      json = object
-    } else if (typeof content === "string" && content.indexOf('{') === 0) {
-      try {
-        const cleaned = rjson.transform(content)
-          .replace(/(\r\n|\n|\r|\'|\s\s)/gm, "")
-          .replaceAll('\\n', '\\\\n')
-        json = JSON.parse(cleaned)
-      } catch (e) {
-        console.log(e)
-        console.log('Unable to parse content');
-      }
-    }
-
-    if (json && json.embeds && json.embeds[0]) {
-      const embed = json.embeds[0];
-
-      if (embed.title.includes("Skipped: Isolation Mode")) {
-        updates.push({
-          repo_type: "BOT",
-          isolation_mode: true
-        })
-      } else if (embed.title.includes("Opened")) {
-        const update = this.parseDescription(embed.description)
-        update.repo_type = "TRADE_OPENED"
-        updates.push(update)
-      } else if (embed.title.includes("Closed")) {
-        const update = this.parseDescription(embed.description)
-        update.repo_type = "TRADE_CLOSED"
-        updates.push(update)
-      }
+    if (typeof content === "object" && content.embeds && content.embeds[0]) {
+      const self = this
+      content.embeds.forEach(function(embed) {
+        console.log('embed:\n' + embed)
+        if (embed.title && embed.title.includes("Skipped: Isolation Mode")) {
+          updates.push({
+            repo_type: "BOT",
+            isolation_mode: true
+          })
+        } else if (embed.title && embed.title.includes("Opened")) {
+          const update = self.parseDescription(embed.description)
+          update.repo_type = "TRADE_OPENED"
+          updates.push(update)
+        } else if (embed.title && embed.title.includes("Closed")) {
+          const update = self.parseDescription(embed.description)
+          update.repo_type = "TRADE_CLOSED"
+          updates.push(update)
+        }
+        // else if (content.startsWith("**QUARANTINED**")) {
+        //   const symbols = /\*\*QUARANTINED\*\*: (.*)/.exec(content)[1]
+        //   updates = updates.concat(symbols.split(', ').map(function(symbol) {
+        //     return {
+        //       repo_type: "QUARANTINED",
+        //       symbol: symbol
+        //     }
+        //   }))
+        // } else if (content.startsWith("**UNQUARANTINED**")) {
+        //   const symbols = /\*\*UNQUARANTINED\*\*: (.*)/.exec(content)[1]
+        //   updates = updates.concat(symbols.split(', ').map(function(symbol) {
+        //     return {
+        //       repo_type: "UNQUARANTINED",
+        //       symbol: symbol
+        //     }
+        //   }))
+        // } else if (content.startsWith("**OPEN POSITIONS - NOT QUARANTINED**")) {
+        //   const symbols = /\*\*OPEN POSITIONS \- NOT QUARANTINED\*\*: (.*)/.exec(content)[1]
+        //   updates = updates.concat(symbols.split(', ').map(function(symbol) {
+        //     return {
+        //       repo_type: "PENDING_QUARANTINE",
+        //       symbol: symbol
+        //     }
+        //   }))
+        // }
+      })
     } else if (typeof content === "string") {
       if (content.includes("Bot Started")) {
         updates.push({
@@ -61,30 +71,6 @@ module.exports = {
           repo_type: "BOT",
           status: "resumed"
         })
-      } else if (content.startsWith("**QUARANTINED**")) {
-        const symbols = /\*\*QUARANTINED\*\*: (.*)/.exec(content)[1]
-        updates = updates.concat(symbols.split(', ').map(function(symbol) {
-          return {
-            repo_type: "QUARANTINED",
-            symbol: symbol
-          }
-        }))
-      } else if (content.startsWith("**UNQUARANTINED**")) {
-        const symbols = /\*\*UNQUARANTINED\*\*: (.*)/.exec(content)[1]
-        updates = updates.concat(symbols.split(', ').map(function(symbol) {
-          return {
-            repo_type: "UNQUARANTINED",
-            symbol: symbol
-          }
-        }))
-      } else if (content.startsWith("**OPEN POSITIONS - NOT QUARANTINED**")) {
-        const symbols = /\*\*OPEN POSITIONS \- NOT QUARANTINED\*\*: (.*)/.exec(content)[1]
-        updates = updates.concat(symbols.split(', ').map(function(symbol) {
-          return {
-            repo_type: "PENDING_QUARANTINE",
-            symbol: symbol
-          }
-        }))
       } else if (content.startsWith("**TRANSFER**")) {
         let update = {
           repo_type: "TRANSFER"
@@ -102,7 +88,7 @@ module.exports = {
         updates.push(update)
       }
     } else {
-      console.log("Content received is not JSON or string")
+      console.log("Content received is not object or string")
       console.log(typeof content)
     }
     return updates
