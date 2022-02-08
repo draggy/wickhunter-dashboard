@@ -9,7 +9,9 @@ module.exports = {
     }
 
     let json = null
-    if (content && content.indexOf('{') === 0) {
+    if (typeof content === "object") {
+      json = object
+    } else if (typeof content === "string" && content.indexOf('{') === 0) {
       try {
         const cleaned = rjson.transform(content)
           .replace(/(\r\n|\n|\r|\'|\s\s)/gm, "")
